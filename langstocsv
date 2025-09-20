@@ -1,0 +1,150 @@
+#!/usr/bin/env php
+<?php
+
+// Función de ayuda
+function showHelp() {
+    echo "Uso: langstocsv [DIRECTORIO]\n";
+    echo "Convierte los archivos de traducción de un directorio moodle 'lang' a CSV.\n\n";
+    echo "Si no se especifica DIRECTORIO, se usa el directorio actual.\n";
+    echo "Opciones:\n";
+    echo "  --help    Muestra esta ayuda\n";
+}
+
+// Revisar argumentos
+$args = $argv;
+array_shift($args); // quitar el script
+
+if (in_array('--help', $args)) {
+    showHelp();
+    exit(0);
+}
+
+// Directorio objetivo
+$basePath = $args[0] ?? getcwd();
+
+// Comprobar que existe y que es un directorio
+if (!is_dir($basePath)) {
+    fwrite(STDERR, "Error: '$basePath' no es un directorio válido.\n");
+    exit(1);
+}
+
+// Comprobar que sea un directorio 'lang'
+if (basename($basePath) !== 'lang') {
+    fwrite(STDERR, "Error: el directorio debe llamarse 'lang'.\n");
+    exit(1);
+}
+
+echo "Procesando directorio: $basePath\n";
+
+
+
+function extractStrings ($filepath) {
+    $strings = [];
+    $content = file($filepath);
+
+    foreach ($content as $line ) {
+        // Buscamos líneas del tipo: $string['clave'] = 'valor';
+        if (preg_match("/\\\$string\\['([^']+)'\\]\s*=\s*'(.*)';/", $line, $matches)) {
+            $key = $matches[1];   // la clave entre comillas
+            $value = $matches[2]; // el texto traducido
+            $strings[$key] = $value;
+        }
+    }
+
+    return $strings;
+}
+
+// --- 1) Detectamos los idiomas (subdirectorios de lang) ---
+$languages = [];
+$subdirectorios = glob($basePath . '/*', GLOB_ONLYDIR);
+$phpFiles = [];
+foreach (glob($basePath . '/*', GLOB_ONLYDIR) as $langDir) {
+    $langCode = basename($langDir);
+    // Buscar el único archivo .php dentro del subdirectorio
+    $phpFiles = glob($langDir . '/*.php');
+    if (count($phpFiles) === 1) {
+        $languages[$langCode] = $phpFiles[0];
+    }
+}
+$nombreArchivo = basename($phpFiles[0]);
+// Le quitamos la extensión al nombre del archivo
+$nombreArchivo = pathinfo($nombreArchivo,PATHINFO_FILENAME);
+
+// --- 2) Extraer los strings de cada idioma ---
+$allStrings = [];
+foreach ($languages as $langCode => $filePath) {
+    $allStrings[$langCode] = extractStrings($filePath);
+}
+
+// --- 3) Combinar claves tomando todas las de todos los idiomas ---
+// Obtener todas las claves existentes en cualquier idioma
+$allKeys = [];
+foreach ($allStrings as $langCode => $strings) {
+    $allKeys = array_merge($allKeys, array_keys($strings));
+}
+$allKeys = array_unique($allKeys); // eliminar duplicados
+sort($allKeys); // opcional: ordenar alfabéticamente
+
+// --- 4) Preparar filas para CSV ---
+// Preparamos el header con el orden de columnas que quaramos
+$idiomas = array_keys($allStrings);
+$ordenPreferencia = ['en', 'es', 'ca'];
+
+usort($idiomas, function($a, $b) use ($ordenPreferencia) {
+    $posA = array_search($a, $ordenPreferencia);
+    $posB = array_search($b, $ordenPreferencia);
+
+    // Si ambos están en la lista de preferencia → mantener ese orden
+    if ($posA !== false && $posB !== false) {
+        return $posA - $posB;
+    }
+
+    // Si solo uno está en la lista de preferencia → ese va antes
+    if ($posA !== false) return -1;
+    if ($posB !== false) return 1;
+
+    // Si ninguno está en la lista → orden alfabético
+    return strcmp($a, $b);
+});
+
+$header = array_merge(['key'], $idiomas); // encabezado: key + idiomas
+
+$rows = [];
+
+foreach ($allKeys as $key) {
+    $row = ['key' => $key];
+    foreach ($allStrings as $langCode => $strings) {
+        $row[$langCode] = $strings[$key] ?? '';
+    }
+    $rows[] = $row;
+}
+
+// --- 5) Exportar a CSV ---
+// Directorio donde guardaremos el csv (/home/usuario/descargas/nombre_mod_langs.csv)
+$home = getenv("HOME") ?: $_SERVER['HOME'];
+$dirDescargas = $home . "/Descargas"; 
+if (!is_dir($dirDescargas)) {
+    $dirDescargas = $home . "/Downloads"; 
+}
+$outputCsv = $dirDescargas . "/" . $nombreArchivo . "_langs.csv";
+
+$fp = fopen($outputCsv, 'w');
+if (!$fp) {
+    die("No se pudo crear el archivo CSV en $outputCsv\n");
+}
+
+// Escribir encabezado
+fputcsv($fp, $header);
+
+// Escribir filas
+foreach ($rows as $row) {
+    // Mantener el orden del encabezado
+    $line = [];
+    foreach ($header as $col) {
+        $line[] = $row[$col] ?? '';
+    }
+    fputcsv($fp, $line);
+}
+
+fclose($fp);
+echo "CSV generado correctamente en $outputCsv\n";
