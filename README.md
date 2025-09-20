@@ -1,11 +1,12 @@
-Perfecto 😃, aquí tienes una versión **extendida del README.md** adaptada para instalar el script en `/usr/local/bin` y que incluya **generación directa del CSV** con ejemplo de salida:
+## Descripción
+
+`exportLangsToCsv` es un script en PHP diseñado para generar un CSV con **todas las cadenas de traducción de  un plugin de Moodle** que se encuentran en su directorio `lang`.
+
+ Está diseñado para trabajar con subdirectorios de idiomas (`en`, `es`, `ca`, etc.), y genera una tabla con todas las claves y sus traducciones.
+ 
+ Su principal utilidad es ayudarte a **ver de manera visual qué cadenas faltan por traducir** o cuáles no se han generado todavía en otros idiomas, facilitando la gestión y mantenimiento de los archivos de idioma.
 
 ````markdown
-# exportLangsToCsv
-
-`exportLangsToCsv` es un script en PHP que convierte archivos de traducción de un directorio `lang` en un archivo CSV. Está diseñado para trabajar con subdirectorios de idiomas (`en`, `es`, `ca`, etc.), y genera una tabla con todas las claves y sus traducciones.
-
----
 
 ## Instalación
 
