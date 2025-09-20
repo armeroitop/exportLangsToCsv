@@ -3,7 +3,7 @@
 
 // Función de ayuda
 function showHelp() {
-    echo "Uso: langstocsv [DIRECTORIO]\n";
+    echo "Uso: exportLangsToCsv [DIRECTORIO]\n";
     echo "Convierte los archivos de traducción de un directorio moodle 'lang' a CSV.\n\n";
     echo "Si no se especifica DIRECTORIO, se usa el directorio actual.\n";
     echo "Opciones:\n";
