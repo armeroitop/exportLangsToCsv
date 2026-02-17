@@ -78,25 +78,38 @@ function update_lang_file($filepath, $translations, $referenceOrder = null) {
         }
     }
 
+    $toInsert = [];
+
     foreach ($translations as $key => $value) {
 
         $escaped = addslashes($value);
         $newline = "\$string['{$key}'] = '{$escaped}';\n";
 
         if (isset($existingKeys[$key])) {
-            // Reemplazar línea existente
+            // 🔁 Reemplazar directamente
             $content[$existingKeys[$key]] = $newline;
         } else {
-
-            // Insertar en misma posición que en EN si existe
+            // 🆕 Guardar para insertar después
             if ($referenceOrder && isset($referenceOrder[$key])) {
-                $insertPos = $referenceOrder[$key];
-                array_splice($content, $insertPos, 0, $newline);
+                $toInsert[$key] = [
+                    'pos' => $referenceOrder[$key],
+                    'line' => $newline
+                ];
             } else {
-                // Añadir al final
+                // Si no tiene referencia, añadir al final
                 $content[] = $newline;
             }
         }
+    }
+
+    // 🔽 Ordenar inserciones por posición DESCENDENTE
+    uasort($toInsert, function($a, $b) {
+        return $b['pos'] <=> $a['pos'];
+    });
+
+    // Insertar desde abajo hacia arriba
+    foreach ($toInsert as $item) {
+        array_splice($content, $item['pos'], 0, $item['line']);
     }
 
     file_put_contents($filepath, implode('', $content));
