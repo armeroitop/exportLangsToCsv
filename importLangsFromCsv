@@ -12,11 +12,16 @@ if (!file_exists($csvfile)) {
 }
 
 // ===============================
+// Raíz de lang = directorio actual
+// ===============================
+$langRoot = getcwd(); // <-- usamos la carpeta desde la que lanzas el comando
+
+// ===============================
 // Detectar pluginfile
 // ===============================
 
 // Autodetectar en lang/en/
-$enDir = __DIR__ . '/en';
+$enDir = $langRoot . '/en';
 if (!is_dir($enDir)) {
     die("No existe el directorio lang/en\n");
 }
@@ -104,7 +109,7 @@ function update_lang_file($filepath, $translations, $referenceOrder = null) {
 
 // Primero procesamos EN y guardamos orden de referencia
 $referenceOrder = [];
-$enfile = __DIR__ . '/en/' . $pluginfile;
+$enfile = $langRoot . '/en/' . $pluginfile;
 
 if (file_exists($enfile)) {
     $lines = file($enfile);
@@ -118,7 +123,7 @@ if (file_exists($enfile)) {
 // Actualizar cada idioma
 foreach ($languages as $lang) {
 
-    $langDir = __DIR__ . '/' . $lang;
+    $langDir = $langRoot . '/' . $lang;
     if (!is_dir($langDir)) {
         echo "No existe directorio $lang\n";
         continue;
