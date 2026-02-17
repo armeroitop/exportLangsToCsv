@@ -1,0 +1,133 @@
+#!/usr/bin/env php
+<?php
+
+if ($argc < 1) {
+    die("Uso: php import_lang.php <archivo.csv>\n");
+}
+
+$csvfile = $argv[1];
+
+if (!file_exists($csvfile)) {
+    die("El CSV no existe: $csvfile\n");
+}
+
+// ===============================
+// Detectar pluginfile
+// ===============================
+
+// Autodetectar en lang/en/
+$enDir = __DIR__ . '/en';
+if (!is_dir($enDir)) {
+    die("No existe el directorio lang/en\n");
+}
+
+$files = glob($enDir . '/*.php');
+
+if (count($files) === 1) {
+    $pluginfile = basename($files[0]);
+    echo "Pluginfile detectado automáticamente: $pluginfile\n";
+} else {
+    die("No se pudo autodetectar el pluginfile.\n");
+}
+
+// ===============================
+// Leer CSV
+// ===============================
+
+// Idiomas detectados desde cabecera CSV
+$handle = fopen($csvfile, 'r');
+if (!$handle) {
+    die("No se pudo abrir el CSV\n");
+}
+
+$header = fgetcsv($handle);
+if (!$header) {
+    die("CSV vacío\n");
+}
+
+// Primera columna es key
+$languages = array_slice($header, 1);
+
+$data = [];
+while (($row = fgetcsv($handle)) !== false) {
+    $key = $row[0];
+    foreach ($languages as $index => $lang) {
+        $data[$lang][$key] = $row[$index + 1] ?? '';
+    }
+}
+fclose($handle);
+
+
+// ===============================
+// FUNCIONES
+// ===============================
+
+function update_lang_file($filepath, $translations, $referenceOrder = null) {
+
+    $content = file_exists($filepath) ? file($filepath) : [];
+
+    $existingKeys = [];
+    foreach ($content as $lineNumber => $line) {
+        if (preg_match("/\\\$string\\['([^']+)'\\]/", $line, $matches)) {
+            $existingKeys[$matches[1]] = $lineNumber;
+        }
+    }
+
+    foreach ($translations as $key => $value) {
+
+        $escaped = addslashes($value);
+        $newline = "\$string['{$key}'] = '{$escaped}';\n";
+
+        if (isset($existingKeys[$key])) {
+            // Reemplazar línea existente
+            $content[$existingKeys[$key]] = $newline;
+        } else {
+
+            // Insertar en misma posición que en EN si existe
+            if ($referenceOrder && isset($referenceOrder[$key])) {
+                $insertPos = $referenceOrder[$key];
+                array_splice($content, $insertPos, 0, $newline);
+            } else {
+                // Añadir al final
+                $content[] = $newline;
+            }
+        }
+    }
+
+    file_put_contents($filepath, implode('', $content));
+}
+
+
+// ===============================
+// PROCESO
+// ===============================
+
+// Primero procesamos EN y guardamos orden de referencia
+$referenceOrder = [];
+$enfile = __DIR__ . '/en/' . $pluginfile;
+
+if (file_exists($enfile)) {
+    $lines = file($enfile);
+    foreach ($lines as $lineNumber => $line) {
+        if (preg_match("/\\\$string\\['([^']+)'\\]/", $line, $matches)) {
+            $referenceOrder[$matches[1]] = $lineNumber;
+        }
+    }
+}
+
+// Actualizar cada idioma
+foreach ($languages as $lang) {
+
+    $langDir = __DIR__ . '/' . $lang;
+    if (!is_dir($langDir)) {
+        echo "No existe directorio $lang\n";
+        continue;
+    }
+
+    $filepath = $langDir . '/' . $pluginfile;
+
+    echo "Procesando $lang...\n";
+    update_lang_file($filepath, $data[$lang], $referenceOrder);
+}
+
+echo "Proceso completado.\n";
